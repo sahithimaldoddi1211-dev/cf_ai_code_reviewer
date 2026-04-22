@@ -1,0 +1,15 @@
+name = "cf-ai-code-reviewer"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "CODE_REVIEW_SESSION"
+class_name = "CodeReviewSession"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["CodeReviewSession"]
