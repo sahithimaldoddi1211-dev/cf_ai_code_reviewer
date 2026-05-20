@@ -66,6 +66,8 @@ cf_ai_code_reviewer/
 
 ---
 
+Deployed through Netlify - https://codereviewer-sm.netlify.app/
+
 ## Running Locally
 
 ### Prerequisites
