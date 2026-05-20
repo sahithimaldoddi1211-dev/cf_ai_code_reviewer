@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
+// ─── CORS helpers ─────────────────────────────────────────────────────────
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -70,21 +71,20 @@ When reviewing code:
 For follow-up questions, reference the code already shared in this session.
 Be direct, specific, and educational. Format using markdown.`;
 
+      // Workers AI expects messages array with a leading system message
       const messages = [
+        { role: "system", content: systemPrompt },
         ...this.history.slice(-10), // last 10 turns for context window
       ];
 
       // Call Workers AI
       const aiResponse = await (this.env as Env).AI.run(
         "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-        {
-          system: systemPrompt,
-          messages,
-        } as Parameters<Ai["run"]>[1]
+        { messages } as Parameters<Ai["run"]>[1]
       );
 
       const assistantMessage =
-        typeof aiResponse === "object" && "response" in aiResponse
+        typeof aiResponse === "object" && aiResponse !== null && "response" in aiResponse
           ? (aiResponse as { response: string }).response
           : JSON.stringify(aiResponse);
 
@@ -123,15 +123,12 @@ Be direct, specific, and educational. Format using markdown.`;
 // ─── Main Worker: Routes requests to Durable Object ──────────────────────
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    // CORS headers
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
-
+    // 1. Always handle CORS preflight FIRST, before any routing
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, {
+        status: 204,
+        headers: CORS_HEADERS,
+      });
     }
 
     const url = new URL(request.url);
@@ -139,37 +136,47 @@ export default {
 
     // Expect: /api/<sessionId>/<action>
     if (pathParts[0] !== "api" || pathParts.length < 3) {
-      return new Response(
-        JSON.stringify({ error: "Use /api/<sessionId>/<action>" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return withCors(
+        new Response(
+          JSON.stringify({ error: "Use /api/<sessionId>/<action>" }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        )
       );
     }
 
     const sessionId = pathParts[1];
     const action = pathParts[2];
 
-    // Route to Durable Object
-    const id = env.CODE_REVIEW_SESSION.idFromName(sessionId);
-    const stub = env.CODE_REVIEW_SESSION.get(id);
+    try {
+      // Route to Durable Object
+      const id = env.CODE_REVIEW_SESSION.idFromName(sessionId);
+      const stub = env.CODE_REVIEW_SESSION.get(id);
 
-    const doUrl = new URL(request.url);
-    doUrl.pathname = `/${action}`;
+      const doUrl = new URL(request.url);
+      doUrl.pathname = `/${action}`;
 
-    const doRequest = new Request(doUrl.toString(), {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-    });
+      const doRequest = new Request(doUrl.toString(), {
+        method: request.method,
+        headers: request.headers,
+        body: request.body,
+      });
 
-    const doResponse = await stub.fetch(doRequest);
-    const body = await doResponse.text();
+      const doResponse = await stub.fetch(doRequest);
+      const body = await doResponse.text();
 
-    return new Response(body, {
-      status: doResponse.status,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
-    });
+      return withCors(
+        new Response(body, {
+          status: doResponse.status,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+    } catch (err) {
+      return withCors(
+        new Response(
+          JSON.stringify({ error: (err as Error).message || "Worker error" }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    }
   },
 };
