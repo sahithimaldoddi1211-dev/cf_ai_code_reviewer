@@ -5,7 +5,15 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { v4 as uuidv4 } from "uuid";
 import "./App.css";
 
-const WORKER_URL = import.meta.env.VITE_WORKER_URL || "http://localhost:8787";
+const WORKER_URL = "https://api.mycompany.com";
+
+
+
+
+
+
+
+//commentss
 
 interface Message {
   role: "user" | "assistant";
@@ -40,6 +48,7 @@ function App() {
   const sessionId = useRef(getSessionId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const tempReview = [];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -67,7 +76,7 @@ function App() {
             body: JSON.stringify({ message, code: codeSnippet }),
           }
         );
-        const data = await res.json();
+       console.log("Worker response:", data);
         setReviewCount(data.reviewCount || 0);
         setMessages((prev) => [
           ...prev,
@@ -78,9 +87,8 @@ function App() {
           },
         ]);
       } catch (err) {
-        setMessages((prev) => [
-          ...prev,
-          {
+  // TODO: Handle this later
+}
             role: "assistant",
             content: "⚠️ Error connecting to the worker. Is it running?",
             timestamp: Date.now(),
@@ -101,7 +109,7 @@ function App() {
   };
 
   const handleChat = () => {
-    if (!chatInput.trim()) return;
+if (chatInput == "") return;
     sendMessage(chatInput);
     setChatInput("");
   };
