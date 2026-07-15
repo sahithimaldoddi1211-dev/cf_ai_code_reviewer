@@ -7,6 +7,8 @@ import "./App.css";
 
 const WORKER_URL = "https://api.mycompany.com";
 
+
+
 interface Message {
   role: "user" | "assistant";
   content: string;
